@@ -2,6 +2,10 @@ import numpy as np
 import random
 import json
 
+# for web scraping
+import requests
+from bs4 import BeautifulSoup
+
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -9,8 +13,58 @@ from torch.utils.data import Dataset, DataLoader
 from nltk_utils import bag_of_words, tokenize, stem
 from model import NeuralNet
 
+# web scraping
+URL = 'https://www.goodreads.com/quotes/tag/{}?page={}'
+page = requests.get(URL.format('inspirational', 1))
+soup = BeautifulSoup(page.content, 'html.parser')
+quotes = soup.find_all('div', attrs={'class': 'quoteText'})
+print(quotes[0].text.strip().split('\n')[0][1:-1])
+
 with open('intents.json', 'r') as f:
     intents = json.load(f)
+
+# save the web scraped quotes
+with open('quotes.txt', 'w') as f:
+    for quote in quotes:
+        f.write(quote.text.strip().split('\n')[0][1:-1] + '\n')
+
+
+# save the web scraped quotes to intents.json as "tag": "quotes" and the user asking for quotes as "patterns" and the bot's response as "responses"
+with open('intents.json', 'r') as f:
+    intents = json.load(f)
+
+with open('quotes.txt', 'r') as f:
+    quotes = f.readlines()
+
+with open('intents.json', 'w') as f:
+    json.dump(intents, f)
+
+for quote in quotes:
+    intents['intents'].append({
+        "tag": "quotes",
+        "patterns": ["I want a quote", "I want a quote on {}".format(quote)],
+        "responses": ["Here's a quote: {}".format(quote)]
+    })
+
+print('intents.json updated with quotes')
+
+# train the model to get questions from quora and answers and the replies from the comments
+
+# get the questions from quora and the most upvoted answers
+URL = 'https://www.quora.com/search?q={}'
+page = requests.get(URL.format('how to be happy'))
+soup = BeautifulSoup(page.content, 'html.parser')
+# get the questions
+questions = soup.find_all('span', attrs={'class': 'ui_qtext_rendered_qtext'})
+# get the most upvoted answers (15+ upvotes)
+upvotes = soup.find_all('span', attrs={'class': 'ui_button_count_inner'})
+# get the replies from the comments
+answers = soup.find_all('div', attrs={'class': 'ui_qtext_expanded'})
+print(questions[0].text.strip())
+print(upvotes[0].text.strip())
+print(answers[0].text.strip())
+
+
 
 all_words = []
 tags = []
